@@ -11,6 +11,7 @@ const { ContractListener } = require('./lib/contract-listener');
 const indexRouter = require('./routes/index');
 const voteRouter = require('./routes/vote');
 const crosschainRouter = require('./routes/cross-chain');
+const namingRouter = require('./routes/naming');
 
 // Check legality of ROLE 
 (process.env.ROLE !== "BRIDGE" && process.env.ROLE !== "MEMBER") ? process.env.ROLE = "MEMBER" :  process.env.ROLE = process.env.ROLE;
@@ -34,6 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/vote', voteRouter);
 app.use('/crosschain', crosschainRouter);
+app.use('/naming', namingRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
