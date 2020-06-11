@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const request = require('request-promise');
 const { TX_STATE } = require('../model/enum/crosschain-status');
 const { ContractManager } = require('../lib/contract-manager');
 const { TransactionSearcher } = require('../lib/transaction-searcher');
@@ -71,6 +72,39 @@ router.patch('/', async (req, res, next) => {
         if (currentState) {
             // check if step is correct
             if ((parseInt(currentState) !== parseInt(txData.state) + 1) && !TX_STATE.REVOKE) return res.status(400).json({ error: "跨鏈請求狀態不對稱" });
+            
+            if (parseInt(currentState) === TX_STATE.COMMIT) {
+                // Search txhash for cross chain information
+                let crossData = await this.txSearch.receiveCrossChainTx(txData.hash);
+                let fromIp = await manager.searchNaming(crossData.from);
+                let toIp = await manager.searchNaming(crossData.to);
+
+                // Send response to relay chain
+                let options = (target, state) => {
+                    return {
+                        method: 'PATCH',
+                        uri: "http://" + target + "/crosschain",
+                        body: {
+                            hash: legal.voteFor,
+                            state: state
+                        },
+                        json: true
+                    }
+                };
+
+                Promise.all([request(options(fromIp, TX_STATE.COMMIT)), request(options(toIp, TX_STATE.COMMIT))])
+                    .then(() => {
+                        manager.changeState(txData.hash, TX_STATE.COMMIT);
+
+                        res.status(200).json({ info: "跨鏈交易 COMMIT 成功" });
+                    })
+                    .catch(() => {
+                        manager.revokeTransaction(txData.hash);
+
+                        res.status(500).json({ error: "跨鏈交易 COMMIT 失敗" });
+                    })
+            }
+
             // invoke change state
             await manager.changeState(txData.hash, txData.state);
             console.log("[INFO] Change cross chain transaction " + txData.hash + " state to " + txData.state + " success.");
