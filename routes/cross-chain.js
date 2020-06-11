@@ -46,8 +46,8 @@ router.post('/', async (req, res, next) => {
         let txRes = await manager.sendTransaction(txData.from, txData.to, "REQUEST", txData.data);
         // Calculate data hash for search
         let dataHash = await manager.calcHash(txData.from, txData.to, "REQUEST", txData.data);
-        // If cross chain is from relay chain send to us, It's Prepare state
-        if (txData.to === parseInt(process.env.CHAIN_ID)) await manager.changeState(dataHash, TX_STATE.PREPARE);
+        // Parepare state when receive from child chain
+        await manager.changeState(dataHash, TX_STATE.PREPARE);
 
         // Log transaction to contract
         await manager.setInitTx(dataHash, txRes.receipt.transactionHash);
@@ -92,7 +92,7 @@ router.patch('/', async (req, res, next) => {
                     }
                 };
 
-                Promise.all([request(options(fromIp, TX_STATE.COMMIT)), request(options(toIp, TX_STATE.COMMIT))])
+                await Promise.all([request(options(fromIp, TX_STATE.COMMIT)), request(options(toIp, TX_STATE.COMMIT))])
                     .then(() => {
                         manager.changeState(txData.hash, TX_STATE.COMMIT);
 
@@ -102,7 +102,7 @@ router.patch('/', async (req, res, next) => {
                         manager.revokeTransaction(txData.hash);
 
                         res.status(500).json({ error: "跨鏈交易 COMMIT 失敗" });
-                    })
+                    });
             }
 
             // invoke change state
