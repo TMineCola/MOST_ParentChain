@@ -68,7 +68,7 @@ router.patch('/', async (req, res, next) => {
     try {
         // Get current state
         let currentState = await manager.getRecentState(txData.hash);
-        console.log(currentState);
+
         if (currentState) {
             // check if step is correct
             if ((parseInt(currentState) !== parseInt(txData.state) + 1) && !TX_STATE.REVOKE) return res.status(400).json({ error: "跨鏈請求狀態不對稱" });
@@ -86,7 +86,7 @@ router.patch('/', async (req, res, next) => {
                         method: 'PATCH',
                         uri: "http://" + target + "/crosschain",
                         body: {
-                            hash: legal.voteFor,
+                            hash: txData.hash,
                             state: state
                         },
                         json: true
