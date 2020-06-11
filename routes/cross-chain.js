@@ -67,15 +67,16 @@ router.patch('/', async (req, res, next) => {
 
     try {
         // Get current state
-        let currentState = manager.getRecentState(txData.hash);
-
+        let currentState = await manager.getRecentState(txData.hash);
+        console.log(currentState);
         if (currentState) {
             // check if step is correct
             if ((parseInt(currentState) !== parseInt(txData.state) + 1) && !TX_STATE.REVOKE) return res.status(400).json({ error: "跨鏈請求狀態不對稱" });
-            
-            if (parseInt(currentState) === TX_STATE.COMMIT) {
+
+            if (parseInt(txData.state) === TX_STATE.COMMIT) {
                 // Search txhash for cross chain information
-                let crossData = await this.txSearch.receiveCrossChainTx(txData.hash);
+                let txHash = await manager.getInitTx(txData.hash);
+                let crossData = await txSearch.receiveCrossChainTx(txHash);
                 let fromIp = await manager.searchNaming(crossData.from);
                 let toIp = await manager.searchNaming(crossData.to);
 
@@ -92,30 +93,33 @@ router.patch('/', async (req, res, next) => {
                     }
                 };
 
-                await Promise.all([request(options(fromIp, TX_STATE.COMMIT)), request(options(toIp, TX_STATE.COMMIT))])
+                await request(options(fromIp, TX_STATE.COMMIT))
                     .then(() => {
-                        manager.changeState(txData.hash, TX_STATE.COMMIT);
+                        console.log("[INFO] Commit to FROM");
 
-                        res.status(200).json({ info: "跨鏈交易 COMMIT 成功" });
+                        return request(options(toIp, TX_STATE.COMMIT))
+                    })
+                    .then(async () => {
+                        console.log("[INFO] Commit to TO");
+                        // invoke change state
+                        await manager.changeState(txData.hash, txData.state);
+                        console.log("[INFO] Change cross chain transaction " + txData.hash + " state to " + txData.state + " success.");
+                        return res.status(200).json({ info: "跨鏈請求狀態更新成功", state: txData.state });
                     })
                     .catch(() => {
-                        manager.revokeTransaction(txData.hash);
-
-                        res.status(500).json({ error: "跨鏈交易 COMMIT 失敗" });
-                    });
+                        return res.status(500).json({ error: "跨鏈交易 COMMIT 失敗" });
+                    })
+                    
+                return;
             }
 
-            // invoke change state
-            await manager.changeState(txData.hash, txData.state);
-            console.log("[INFO] Change cross chain transaction " + txData.hash + " state to " + txData.state + " success.");
-            return res.status(200).json({ info: "跨鏈請求狀態更新成功", state: txData.state });
         } else {
             console.log("[ERROR] Change cross chain transaction " + txData.hash + " state to " + txData.state + " fail. Error: Cannot found specific hash " + txData.hash);
             return res.status(404).json({ error: "找不到該跨鏈請求" });
         }
 
     } catch (err) {
-        console.log("[ERROR] Change cross chain transaction " + txData.hash + " state to " + state + "fail. Error: " + err.message);
+        console.log("[ERROR] Change cross chain transaction " + txData.hash + " state to " + txData.state + " fail. Error: " + err.message);
         return res.status(500).json({ error: "伺服器發生錯誤" });
     }
 });
