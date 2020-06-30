@@ -81,7 +81,7 @@
     - `BRIDGE_NODE_IP` 橋接節點 IP Address
 10. 啟動服務
     ```
-    npm start npm --name "顯示名稱, 如: Node1" -- start
+    pm2 start npm --name "顯示名稱, 如: Node1" -- start
     ```
 
 **可以建立多個節點服務對應不同的帳號及 Port**
